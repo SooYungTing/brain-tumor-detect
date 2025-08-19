@@ -64,3 +64,32 @@ aug = ImageDataGenerator(
     zoom_range=0.05,
     horizontal_flip=False
 )
+
+# model 
+## smaller head, lower dropout
+base = MobileNetV2(include_top=False, weights='imagenet', input_shape=(IMG_SIZE, IMG_SIZE, 3))
+
+### stage 1 : freeze backbone (first 5 epoch)
+for layer in base.layers:
+    layer.trainable = False
+
+model = Sequential([
+    base, 
+    GlobalAveragePooling2D(),
+    Dense(128, activation='relu'),
+    Dropout(0.3),
+    Dense(len(classes), activation='softmax')
+])
+
+model.compile(
+    optimizer=tf.keras.optimizers.Adam(1e-3),
+    loss='categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+# callbacks
+callbacks = [
+    tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=4, restore_best_weights=True),
+    tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=2, min_lr=1e-5)
+]
+
