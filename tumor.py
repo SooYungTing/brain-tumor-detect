@@ -46,3 +46,21 @@ x_test, y_test  = load_images(test_dir)
 
 print("Train:", x_train.shape, np.bincount(y_train))
 print("Test :", x_test.shape,  np.bincount(y_test))
+
+# one hot encoding + class weights
+y_train_onehot = tf.keras.utils.to_categorical(y_train, len(classes))
+y_test_onehot  = tf.keras.utils.to_categorical(y_test,  len(classes))
+
+class_weights = compute_class_weight('balanced',
+                                     classes=np.arange(len(classes)),
+                                     y=y_train)
+class_weights = dict(enumerate(class_weights))
+
+# mild augmentation (prevent over-fitting)
+aug = ImageDataGenerator(
+    rotation_range=8,
+    width_shift_range=0.03,
+    height_shift_range=0.03,
+    zoom_range=0.05,
+    horizontal_flip=False
+)
