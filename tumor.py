@@ -1,3 +1,7 @@
+"""
+    Brain Tumor MRI Classifier - Model Back-end
+    $ python tumor.py 
+"""
 import os
 os.environ['KERAS_HOME'] = os.path.join(os.getcwd(), 'keras_cache')
 
@@ -20,7 +24,7 @@ if gpus:
 path = kagglehub.dataset_download("masoudnickparvar/brain-tumor-mri-dataset")
 train_dir = os.path.join(path, "Training")
 test_dir  = os.path.join(path, "Testing")
-classes   = ["glioma", "meningioma", "notumor", "pituitary"]
+classes   = ["pituitary", "notumor", "meningioma", "glioma"]
 IMG_SIZE  = 224
 
 # Data loading and preprocessing
@@ -92,4 +96,55 @@ callbacks = [
     tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=4, restore_best_weights=True),
     tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=2, min_lr=1e-5)
 ]
+## stage 1: frozen backbone (5 epochs)
+BATCH = 64
+history1 = model.fit(
+    aug.flow(x_train, y_train_onehot, batch_size=BATCH),
+    epoch=5,
+    validation_data=(x_test, y_test_onehot),
+    steps_per_epoch = len(x_train)//BATCH,
+    class_weight= class_weights,
+    verbose=2
+)
 
+## stage 2 : unfreeze deeper layers + lower learning rate
+for layer in base.layers[10:]:
+    layer.trainable = True
+
+model.compile(optimizer=tf.keras.optimizers.Adam(3e-4),
+              loss='categorical_crossentropy',
+              metrics=['accuracy']
+)
+
+history2 = model.fit(
+    aug.flow(x_train, y_train_onehot, batch_size=BATCH),
+    epochs=20,
+    initial_epoch=history1.epoch[-1]+1,
+    validation_data = (x_test, y_test_onehot),
+    steps_per_epoch= len(x_train)//BATCH,
+    class_weight=class_weights,
+    callbacks=callbacks,
+    verbose=2
+)
+
+# evaluate
+loss, acc = model.evaluate(x_test, y_test_onehot, verbose=0)
+print(f"Final test accuracy: {acc:.4f}")
+
+cm = confusion_matrix(
+    np.argmax(y_test_onehot,1),
+    np.argmax(model.predict(x_test),1)
+)
+sns.heatmap(cm, 
+            annot=True, 
+            fmt='d',
+            xticklabels=classes,
+            yticklabels=classes,
+            cmap='Blues'
+            )
+plt.title("Confusion Matrix - final")
+plt.show()
+
+# save the model
+model.save("brain_tumor.h5")
+print("Saved brain_tumor.h5")
