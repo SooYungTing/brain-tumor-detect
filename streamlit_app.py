@@ -18,7 +18,7 @@ def load_model():
     if not os.path.isfile(MODEL_PATH):
         st.error(f"Model file '{MODEL_PATH}' not found.")
         st.stop()
-    return tf.keras.models.load_model(MODEL_PATH)
+    return tf.keras.models.load_model(MODEL_PATH, compile=False)
 
 model = load_model()
 
