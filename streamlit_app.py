@@ -11,7 +11,7 @@ import streamlit as st
 from PIL import Image
 
 # constants
-MODEL_URL  = "https://dl.dropboxusercontent.com/s/qsyekfs8p22n1wc1900dm/brain_tumor.h5"
+MODEL_URL = st.secrets["MODEL_URL"]
 MODEL_PATH = "brain_tumor.h5"
 IMG_SIZE = 224
 CLASSES = ["pituitary", "notumor", "meningioma", "glioma"]
