@@ -1,14 +1,12 @@
-# ---- Core ML (CPU) ----
 tensorflow==2.20.0
 h5py>=3.10.0
 numpy>=1.26,<3
 opencv-python-headless>=4.8
+gdown>=5.2.0
 
-# ---- Web & UI ----
 streamlit>=1.33
 pillow>=10.3
 
-# ---- Data / Plotting ----
 pandas>=2.2
 scikit-learn>=1.4
 seaborn>=0.13

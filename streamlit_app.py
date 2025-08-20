@@ -1,31 +1,39 @@
 """
-Brain-Tumor MRI Classifier - Streamlit Front-end
-Model: brain_tumor.h5
+Brain-Tumor MRI Classifier - Streamlit Front-end (Google Drive model)
 Run: streamlit run streamlit_app.py
 """
 
 import os
+from pathlib import Path
+import hashlib
 import numpy as np
 import cv2
 import h5py
+import gdown
 import tensorflow as tf
 import streamlit as st
 from PIL import Image
 
-# --------------------
-# Constants & settings
-# --------------------
-MODEL_PATH = "brain_tumor.h5"
-IMG_SIZE   = 224
-CLASSES    = ["pituitary", "notumor", "meningioma", "glioma"]
+# ---------- CONFIG ----------
+GDRIVE_FILE_ID = "1hyFu6_sTE7lKJniBRTownckrTT8OrIIf"   # <- your file ID
+EXPECTED_SHA256 = None  # optional: paste your local sha256 here to verify
+CACHE_DIR = Path("models")
+MODEL_PATH = CACHE_DIR / "brain_tumor.h5"
 
-# Make TF logs quieter in prod
+IMG_SIZE = 224
+CLASSES = ["pituitary", "notumor", "meningioma", "glioma"]
+# ---------------------------
+
 tf.get_logger().setLevel("ERROR")
 
-# --------------------
-# Helpers
-# --------------------
-def _is_valid_hdf5(path: str) -> bool:
+def sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+def is_valid_hdf5(path: Path) -> bool:
     try:
         with h5py.File(path, "r"):
             return True
@@ -33,51 +41,61 @@ def _is_valid_hdf5(path: str) -> bool:
         return False
 
 @st.cache_resource(show_spinner=True)
-def load_model():
-    if not os.path.isfile(MODEL_PATH):
-        st.error(f"Model file '{MODEL_PATH}' not found.")
+def load_model() -> tf.keras.Model:
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+    # 1) Download from Google Drive if missing/empty
+    if not MODEL_PATH.exists() or MODEL_PATH.stat().st_size < 1024:
+        url = f"https://drive.google.com/uc?id={GDRIVE_FILE_ID}"
+        tmp_path = CACHE_DIR / (MODEL_PATH.name + ".part")
+        gdown.download(url, str(tmp_path), quiet=False)  # handles confirm token
+
+        if not tmp_path.exists() or tmp_path.stat().st_size < 1024:
+            st.error("Download from Google Drive failed or returned an empty file.")
+            st.stop()
+
+        tmp_path.replace(MODEL_PATH)
+
+    # 2) Sanity checks: not LFS/HTML, valid HDF5
+    with open(MODEL_PATH, "rb") as f:
+        head = f.read(256)
+    if b"git-lfs.github.com/spec/v1" in head:
+        st.error("Downloaded file is a Git LFS pointer, not the actual weights.")
+        st.stop()
+    if b"<html" in head.lower() or b"<!doctype html" in head.lower():
+        st.error("Google Drive returned an HTML page (bad/unauthorized link). "
+                 "Set sharing to 'Anyone with the link'.")
         st.stop()
 
-    # sanity-check the .h5 so we fail gracefully if it's corrupt/LFS/HTML
-    if not _is_valid_hdf5(MODEL_PATH):
-        st.error(
-            f"'{MODEL_PATH}' is not a valid HDF5 file (it may be corrupted, a Git LFS pointer, or an HTML download)."
-        )
+    if not is_valid_hdf5(MODEL_PATH):
+        st.error(f"'{MODEL_PATH.name}' is not a valid HDF5 file (corrupted/truncated).")
         st.stop()
 
-    # compile=False avoids needing the original training-time objects
-    model = tf.keras.models.load_model(MODEL_PATH, compile=False)
-    return model
+    if EXPECTED_SHA256:
+        digest = sha256(MODEL_PATH)
+        if digest != EXPECTED_SHA256:
+            st.error("Model checksum mismatch. Refusing to load.")
+            st.stop()
+
+    # 3) Load the model (Keras 3 via TF 2.20 supports legacy .h5 with h5py)
+    return tf.keras.models.load_model(str(MODEL_PATH), compile=False)
 
 model = load_model()
 
 def preprocess(pil_image: Image.Image) -> np.ndarray:
-    """Convert PIL image to normalized NCHW batch the model expects (NHWC actually)."""
-    # Ensure RGB (handles grayscale or RGBA inputs robustly)
     if pil_image.mode != "RGB":
         pil_image = pil_image.convert("RGB")
-
-    # Resize with good quality
     img = np.array(pil_image)
     img = cv2.resize(img, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA)
-
-    # Scale to [0,1]
     img = img.astype(np.float32) / 255.0
-
-    # Add batch dimension -> (1, H, W, C)
     return np.expand_dims(img, axis=0)
 
-# --------------------
-# UI
-# --------------------
+# -------------- UI --------------
 st.set_page_config(page_title="🧠 Brain-Tumor MRI Classifier", layout="centered")
 st.title("🧠 Brain-Tumor MRI Classification")
 st.markdown("Upload an axial T1-weighted MRI slice and the model will classify it.")
 
-uploaded = st.file_uploader(
-    "Choose an image...",
-    type=["jpg", "jpeg", "png", "tif", "tiff"]
-)
+uploaded = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png", "tif", "tiff"])
 
 if uploaded is not None:
     try:
@@ -91,9 +109,8 @@ if uploaded is not None:
     if st.button("🔍 Classify"):
         with st.spinner("Analysing..."):
             x = preprocess(pil_image)
-            # Model should output probabilities; if logits, add softmax here
             probs = model.predict(x)[0]
-            # if the model outputs logits, uncomment next line:
+            # If your model outputs logits, uncomment:
             # probs = tf.nn.softmax(probs).numpy()
 
             label_idx = int(np.argmax(probs))
@@ -103,6 +120,4 @@ if uploaded is not None:
         st.success("Done!")
         st.metric("Predicted class", label.upper())
         st.metric("Confidence", f"{confidence:.2%}")
-
-        # Display probabilities as a bar chart
         st.bar_chart({c: float(p) for c, p in zip(CLASSES, probs)})
