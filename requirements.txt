@@ -1,12 +1,17 @@
-tensorflow==2.13.0
-keras==2.13.1
-h5py==3.10.0
-numpy==1.24.4
-opencv-python-headless==4.8.1.78
-streamlit==1.33.0
-pillow==10.3.0
-pandas==2.2.2
-scikit-learn==1.4.2
-seaborn==0.13.2
-matplotlib==3.8.4
+# ---- Core ML (CPU) ----
+tensorflow==2.20.0
+h5py>=3.10.0
+numpy>=1.26,<3
+opencv-python-headless>=4.8
+
+# ---- Web & UI ----
+streamlit>=1.33
+pillow>=10.3
+
+# ---- Data / Plotting ----
+pandas>=2.2
+scikit-learn>=1.4
+seaborn>=0.13
+matplotlib>=3.8
+
 kagglehub==0.3.12
