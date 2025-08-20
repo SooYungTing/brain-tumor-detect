@@ -4,7 +4,7 @@
     $ streamlit run streamlit_app.py
 """
 
-import os, cv2, zipfile, requests, io
+import os, cv2
 import numpy as np
 import tensorflow as tf
 import streamlit as st
@@ -15,7 +15,7 @@ MODEL_PATH = "brain_tumor.h5"
 IMG_SIZE = 224
 CLASSES = ["pituitary", "notumor", "meningioma", "glioma"]
 
-GDRIVE_URL = "https://drive.google.com/uc?id=1hyFu6_sTE7lKJniBRTownckrTT8OrIIf&export=download"
+GDRIVE_URL = "https://dl.dropboxusercontent.com/s/qsyekfs8p22n1wc1900dm/brain_tumor.h5"
 DATA_DIR   = "dataset"
 
 # download & unzip every deployment
@@ -32,9 +32,6 @@ def fetch_dataset(url, dest):
         z = zipfile.ZipFile(io.BytesIO(r.content))
         z.extractall(dest)
     return dest
-
-train_dir = os.path.join(fetch_dataset(GDRIVE_URL, DATA_DIR), "Training")
-test_dir  = os.path.join(train_dir.replace("Training", "Testing"))
 
 # Load model 
 @st.cache_resource
