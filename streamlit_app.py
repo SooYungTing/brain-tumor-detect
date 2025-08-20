@@ -4,7 +4,7 @@
     $ streamlit run streamlit_app.py
 """
 
-import os, cv2
+import os, cv2, zipfile, requests, io
 import numpy as np
 import tensorflow as tf
 import streamlit as st
@@ -15,6 +15,26 @@ MODEL_PATH = "brain_tumor.h5"
 IMG_SIZE = 224
 CLASSES = ["pituitary", "notumor", "meningioma", "glioma"]
 
+GDRIVE_URL = "https://drive.google.com/uc?id=1hyFu6_sTE7lKJniBRTownckrTT8OrIIf&export=download"
+DATA_DIR   = "dataset"
+
+# download & unzip every deployment
+@st.cache_resource(show_spinner=True)
+def fetch_dataset(url, dest):
+    if os.path.exists(dest):
+        return dest
+    os.makedirs(dest, exist_ok=True)
+
+    # Stream large file
+    with st.spinner("Downloading dataset from Google Drive …"):
+        r = requests.get(url, stream=True, timeout=60)
+        r.raise_for_status()
+        z = zipfile.ZipFile(io.BytesIO(r.content))
+        z.extractall(dest)
+    return dest
+
+train_dir = os.path.join(fetch_dataset(GDRIVE_URL, DATA_DIR), "Training")
+test_dir  = os.path.join(train_dir.replace("Training", "Testing"))
 
 # Load model 
 @st.cache_resource
