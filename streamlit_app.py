@@ -14,15 +14,14 @@ import tensorflow as tf
 import streamlit as st
 from PIL import Image
 
-# ---------- CONFIG ----------
-GDRIVE_FILE_ID = "1hyFu6_sTE7lKJniBRTownckrTT8OrIIf"   # <- your file ID
-EXPECTED_SHA256 = None  # optional: paste your local sha256 here to verify
+#constant
+GDRIVE_FILE_ID = "1hyFu6_sTE7lKJniBRTownckrTT8OrIIf"  
+EXPECTED_SHA256 = None  
 CACHE_DIR = Path("models")
 MODEL_PATH = CACHE_DIR / "brain_tumor.h5"
 
 IMG_SIZE = 224
 CLASSES = ["pituitary", "notumor", "meningioma", "glioma"]
-# ---------------------------
 
 tf.get_logger().setLevel("ERROR")
 
@@ -44,11 +43,11 @@ def is_valid_hdf5(path: Path) -> bool:
 def load_model() -> tf.keras.Model:
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-    # 1) Download from Google Drive if missing/empty
+    # Download from Google Drive if missing/empty
     if not MODEL_PATH.exists() or MODEL_PATH.stat().st_size < 1024:
         url = f"https://drive.google.com/uc?id={GDRIVE_FILE_ID}"
         tmp_path = CACHE_DIR / (MODEL_PATH.name + ".part")
-        gdown.download(url, str(tmp_path), quiet=False)  # handles confirm token
+        gdown.download(url, str(tmp_path), quiet=False) 
 
         if not tmp_path.exists() or tmp_path.stat().st_size < 1024:
             st.error("Download from Google Drive failed or returned an empty file.")
@@ -56,7 +55,7 @@ def load_model() -> tf.keras.Model:
 
         tmp_path.replace(MODEL_PATH)
 
-    # 2) Sanity checks: not LFS/HTML, valid HDF5
+    # Sanity checks: not LFS/HTML, valid HDF5
     with open(MODEL_PATH, "rb") as f:
         head = f.read(256)
     if b"git-lfs.github.com/spec/v1" in head:
@@ -77,7 +76,7 @@ def load_model() -> tf.keras.Model:
             st.error("Model checksum mismatch. Refusing to load.")
             st.stop()
 
-    # 3) Load the model (Keras 3 via TF 2.20 supports legacy .h5 with h5py)
+    # Load the model (Keras 3 via TF 2.20 supports legacy .h5 with h5py)
     return tf.keras.models.load_model(str(MODEL_PATH), compile=False)
 
 model = load_model()
@@ -90,7 +89,7 @@ def preprocess(pil_image: Image.Image) -> np.ndarray:
     img = img.astype(np.float32) / 255.0
     return np.expand_dims(img, axis=0)
 
-# -------------- UI --------------
+# UI
 st.set_page_config(page_title="🧠 Brain-Tumor MRI Classifier", layout="centered")
 st.title("🧠 Brain-Tumor MRI Classification")
 st.markdown("Upload an axial T1-weighted MRI slice and the model will classify it.")
@@ -110,7 +109,7 @@ if uploaded is not None:
         with st.spinner("Analysing..."):
             x = preprocess(pil_image)
             probs = model.predict(x)[0]
-            # If your model outputs logits, uncomment:
+            # If model outputs logits, uncomment
             # probs = tf.nn.softmax(probs).numpy()
 
             label_idx = int(np.argmax(probs))
