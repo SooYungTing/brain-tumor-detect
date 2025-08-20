@@ -11,34 +11,20 @@ import streamlit as st
 from PIL import Image
 
 # constants
+MODEL_URL  = "https://dl.dropboxusercontent.com/s/qsyekfs8p22n1wc1900dm/brain_tumor.h5"
 MODEL_PATH = "brain_tumor.h5"
 IMG_SIZE = 224
 CLASSES = ["pituitary", "notumor", "meningioma", "glioma"]
 
-GDRIVE_URL = "https://dl.dropboxusercontent.com/s/qsyekfs8p22n1wc1900dm/brain_tumor.h5"
-DATA_DIR   = "dataset"
-
-# download & unzip every deployment
 @st.cache_resource(show_spinner=True)
-def fetch_dataset(url, dest):
-    if os.path.exists(dest):
-        return dest
-    os.makedirs(dest, exist_ok=True)
-
-    # Stream large file
-    with st.spinner("Downloading dataset from Google Drive …"):
-        r = requests.get(url, stream=True, timeout=60)
-        r.raise_for_status()
-        z = zipfile.ZipFile(io.BytesIO(r.content))
-        z.extractall(dest)
-    return dest
-
-# Load model 
-@st.cache_resource
 def load_model():
     if not os.path.isfile(MODEL_PATH):
-        st.error(f"Model file '{MODEL_PATH}' not found.")
-        st.stop()
+        with st.spinner("Downloading model …"):
+            import requests, io
+            r = requests.get(MODEL_URL, timeout=60)
+            r.raise_for_status()
+            with open(MODEL_PATH, "wb") as f:
+                f.write(r.content)
     return tf.keras.models.load_model(MODEL_PATH)
 
 model = load_model()
